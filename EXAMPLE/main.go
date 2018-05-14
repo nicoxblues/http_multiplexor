@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/nicoxblues/http_multiplexor"
+
+	"http_multiplexor"
 )
 
 type TestSend struct {
@@ -10,7 +11,9 @@ type TestSend struct {
 	Param2 string `json:"param2"`
 }
 
-func (t *TestSend) WriteEntity() {
+func (t *TestSend) WriteEntity(clientContext *http_multiplexor.ClientCustomContext) {
+	param := clientContext.CliRequest.UrlParameters
+	fmt.Println(param)
 
 }
 
@@ -28,6 +31,14 @@ func main() {
 		fmt.Println(stest.Param1)
 
 	}, stest)
+
+
+	httpMux.AddMethodRestFul("GET", "/TEST_GET", func(context *http_multiplexor.ClientCustomContext) {
+		fmt.Println(stest.Param1)
+
+	}, stest)
+
+
 
 	httpMux.RunServer()
 

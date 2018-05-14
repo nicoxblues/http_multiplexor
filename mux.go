@@ -12,22 +12,22 @@ import (
 var multiPlex *multiplexor
 
 type Entity interface {
-	WriteEntity()
+	WriteEntity(*ClientCustomContext)
 }
 
 type funcMethod func(*ClientCustomContext)
 
 type parsedClientRequest struct {
-	entity        *Entity
-	urlRaw        string
-	urlParameters map[string]string
+	Entity        *Entity
+	RawUrl        string
+	UrlParameters map[string][]string
 
-	clientIP string
+	ClientIP string
 }
 
 type ClientCustomContext struct {
-	ctx        *gin.Context
-	cliRequest parsedClientRequest
+	Ctx        *gin.Context
+	CliRequest *parsedClientRequest
 }
 
 type HandlerMethod func(relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
@@ -39,9 +39,11 @@ type handlerComunitaction struct {
 	obj             Entity
 	getData         func(*handlerComunitaction) interface{}
 	OriginalCtx     *gin.Context
+	clientCtx       *ClientCustomContext
 }
 
 func (hc *handlerComunitaction) getDataContext(ctx *ClientCustomContext) interface{} {
+	hc.clientCtx = ctx
 	return hc.getData(hc)
 }
 
@@ -52,15 +54,22 @@ func (hc *handlerComunitaction) executeInterpreter(relativePath string, funcExec
 	hc.hadlerMethodRef(relativePath, func(context *gin.Context) {
 
 		hc.OriginalCtx = context
-		customContext := &ClientCustomContext{ctx: context}
+		customContext := &ClientCustomContext{Ctx: context}
 
 		clientWrapperReq := parsedClientRequest{}
+		customContext.CliRequest = &clientWrapperReq
+
 		ip, _ := getClientIPByRequest(context.Request)
 
-		clientWrapperReq.clientIP = ip
+		clientWrapperReq.ClientIP = ip
+		clientWrapperReq.RawUrl = context.Request.URL.Path
+		clientWrapperReq.UrlParameters = context.Request.URL.Query()
+
+
+
 		hc.getDataContext(customContext)
 
-		customContext.cliRequest = clientWrapperReq
+
 		funcExec(customContext)
 
 	})
@@ -116,7 +125,7 @@ func NewMux() *multiplexor {
 
 		handler.getData = func(hc *handlerComunitaction) interface{} {
 
-			hc.obj.WriteEntity()
+			hc.obj.WriteEntity(hc.clientCtx)
 			return hc.obj
 		}
 
