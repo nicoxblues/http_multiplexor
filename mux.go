@@ -18,15 +18,16 @@ var multiPlex *multiplexor
 
 type Entity interface {
 	WriteEntity(*ClientCustomContext)
+	
 }
 
 type funcMethod func(*ClientCustomContext)
 
 type parsedClientRequest struct {
-	Entity        *Entity
-	RawUrl        string
-	UrlParameters map[string][]string
-	clientSession *AppSession
+	Entity              *Entity
+	RawUrl              string
+	UrlParameters       map[string][]string
+	ClientCookieSession *AppSession
 
 	ClientIP string
 }
@@ -35,6 +36,7 @@ type ClientCustomContext struct {
 	Ctx        *gin.Context
 	CliRequest *parsedClientRequest
 	OriginalClientRequest *http.Request
+
 }
 
 type HandlerMethod func(relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
@@ -79,9 +81,11 @@ func (hc *handlerComunitaction) executeInterpreter(relativePath string, funcExec
 
 		appSession := hc.getSessionFromRequest(customContext)
 
-		ip, _ := getClientIPByRequest(context.Request)
+		//ip, _ := getClientIPByRequest(context.Request)
+		ip := context.ClientIP()
+		//fmt.Println(ip2)
 		clientWrapperReq :=
-			&parsedClientRequest{clientSession:appSession,
+			&parsedClientRequest{ClientCookieSession:appSession,
 												UrlParameters:context.Request.URL.Query(),
 												ClientIP:ip,
 												RawUrl:context.Request.URL.Path}
@@ -161,6 +165,7 @@ func NewMux() *multiplexor {
 		handler := handlerComunitaction{hadlerMethodRef: r.GET}
 
 		handler.getData = func(hc *handlerComunitaction) interface{} {
+
 
 			hc.obj.WriteEntity(hc.clientCtx)
 			return hc.obj
