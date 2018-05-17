@@ -18,7 +18,7 @@ var multiPlex *multiplexor
 
 type Entity interface {
 	WriteEntity(*ClientCustomContext)
-	
+
 }
 
 type funcMethod func(*ClientCustomContext)
@@ -43,15 +43,15 @@ type HandlerMethod func(relativePath string, handlers ...gin.HandlerFunc) gin.IR
 
 // TODO: quiero usarlo para que controle la sessiones,  de alguna manera, no se, es una idea que aun no termino de armar
 
-type handlerComunitaction struct {
-	hadlerMethodRef HandlerMethod
-	obj             Entity
-	getData         func(*handlerComunitaction) interface{}
-	OriginalCtx     *gin.Context
-	clientCtx       *ClientCustomContext
+type handlerCommunication struct {
+	handlerMethodRef HandlerMethod
+	obj              Entity
+	getData          func(*handlerCommunication) interface{}
+	OriginalCtx      *gin.Context
+	clientCtx        *ClientCustomContext
 }
 
-func (hc *handlerComunitaction) getDataContext(ctx *ClientCustomContext) interface{} {
+func (hc *handlerCommunication) getDataFromContext(ctx *ClientCustomContext) interface{} {
 	hc.clientCtx = ctx
 	return hc.getData(hc)
 }
@@ -59,7 +59,13 @@ func (hc *handlerComunitaction) getDataContext(ctx *ClientCustomContext) interfa
 type InterpreterExecuteFunction func(*ClientCustomContext)
 
 
-func (hc *handlerComunitaction) getSessionFromRequest(ctx *ClientCustomContext) *AppSession{
+func (hc *handlerCommunication) getSessionCookieFromRequest(ctx *ClientCustomContext) *AppSession{
+
+	//sessionDB, err := mgo.Dial("localhost")
+
+	//fmt.Println(err)
+	//c := sessionDB.DB("baseName?")
+//	fmt.Println(c)
 
 	session , _ := Store.Get(ctx.OriginalClientRequest,"sessionStore")
 
@@ -68,9 +74,9 @@ func (hc *handlerComunitaction) getSessionFromRequest(ctx *ClientCustomContext) 
 
 }
 
-func (hc *handlerComunitaction) executeInterpreter(relativePath string, funcExec InterpreterExecuteFunction) {
+func (hc *handlerCommunication) executeInterpreter(relativePath string, funcExec InterpreterExecuteFunction) {
 
-	hc.hadlerMethodRef(relativePath, func(context *gin.Context) {
+	hc.handlerMethodRef(relativePath, func(context *gin.Context) {
 
 
 
@@ -79,7 +85,7 @@ func (hc *handlerComunitaction) executeInterpreter(relativePath string, funcExec
 		customContext.OriginalClientRequest = context.Request
 
 
-		appSession := hc.getSessionFromRequest(customContext)
+		appSession := hc.getSessionCookieFromRequest(customContext)
 
 		//ip, _ := getClientIPByRequest(context.Request)
 		ip := context.ClientIP()
@@ -95,11 +101,11 @@ func (hc *handlerComunitaction) executeInterpreter(relativePath string, funcExec
 
 
 
-		var valStr string = "[ '{{repeat(5, 7)}}', { _id: '{{objectId()}}', index: '{{index()}}', guid: '{{guid()}}', isActive: '{{bool()}}', balance: '{{floating(1000, 4000, 2, ', picture: 'http://placehold.it/32x32', age: '{{integer(20, 40)}}', eyeColor: '{{random('blue', 'brown', 'green')}}', name: '{{firstName()}} {{surname()}}', gender: '{{gender()}}', company: '{{company().toUpperCase()}}', email: '{{email()}}', phone: '+1 {{phone()}}', address: '{{integer(100, 999)}} {{street()}}, {{city()}}, {{state()}}, {{integer(100, 10000)}}', about: '{{lorem(1, 'paragraphs')}}', registered: '{{date(new Date(2014, 0, 1), new Date(), 'YYYY-MM-ddThh:mm:ss Z')}}', latitude: '{{floating(-90.000001, 90)}}', longitude: '{{floating(-180.000001, 180)}}', tags: [ '{{repeat(7)}}', '{{lorem(1, 'words')}}' ], friends: [ '{{repeat(3)}}', { id: '{{index()}}', name: '{{firstName()}} {{surname()}}' } ], greeting: function (tags) { return 'Hello, ' + this.name + '! You have ' + tags.integer(1, 10) + ' unread messages.'; }, favoriteFruit: function (tags) { var fruits = ['apple', 'banana', 'strawberry']; return fruits[tags.integer(0, fruits.length - 1)]; } } ]"
+		var valStr = "asdasd"
 
 		appSession.Values["codigoRojo"] = []byte(valStr)
 
-		hc.getDataContext(customContext)
+		hc.getDataFromContext(customContext)
 
 
 		funcExec(customContext)
@@ -110,13 +116,13 @@ func (hc *handlerComunitaction) executeInterpreter(relativePath string, funcExec
 
 }
 
-func (hc *handlerComunitaction) getMethodHandler() *HandlerMethod {
+func (hc *handlerCommunication) getMethodHandler() *HandlerMethod {
 
-	return &hc.hadlerMethodRef
+	return &hc.handlerMethodRef
 
 }
 
-type GinWrapperHandler func() handlerComunitaction
+type GinWrapperHandler func() handlerCommunication
 
 type multiplexor struct {
 	routerEngine *gin.Engine
@@ -160,11 +166,11 @@ func NewMux() *multiplexor {
 
 	multiPlex.methodMap = make(map[string]*GinWrapperHandler)
 
-	var getFunction GinWrapperHandler = func() handlerComunitaction {
+	var getFunction GinWrapperHandler = func() handlerCommunication {
 
-		handler := handlerComunitaction{hadlerMethodRef: r.GET}
+		handler := handlerCommunication{handlerMethodRef: r.GET}
 
-		handler.getData = func(hc *handlerComunitaction) interface{} {
+		handler.getData = func(hc *handlerCommunication) interface{} {
 
 
 			hc.obj.WriteEntity(hc.clientCtx)
@@ -174,11 +180,11 @@ func NewMux() *multiplexor {
 		return handler
 	}
 
-	var postFunction GinWrapperHandler = func() handlerComunitaction {
+	var postFunction GinWrapperHandler = func() handlerCommunication {
 
-		handler := handlerComunitaction{hadlerMethodRef: r.POST}
+		handler := handlerCommunication{handlerMethodRef: r.POST}
 
-		handler.getData = func(hc *handlerComunitaction) interface{} {
+		handler.getData = func(hc *handlerCommunication) interface{} {
 
 			if hc.obj != nil { //GET, POST
 				hc.OriginalCtx.Bind(hc.obj)

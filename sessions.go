@@ -18,6 +18,12 @@ func (ass *AppSession) Save(clientContext *ClientCustomContext){
 }
 
 
+func (ass *AppSession) BindJson(obj interface{}){
+
+
+}
+
+
 
 
 func NewStoreForSessionType (typeSession string,keyPairs ...[]byte) sessions.Store{

@@ -23,6 +23,7 @@ func main() {
 	stest := &TestSend{}
 
 	httpMux.AddMethodRestFul("GET", "/", func(context *http_multiplexor.ClientCustomContext) {
+
 		fmt.Println(stest.Param1)
 
 	}, stest)
