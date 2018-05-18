@@ -5,9 +5,20 @@ import (
 
 )
 
+
+
+const (
+	LoguinUser = 0
+	AdminUser  = 2
+	GuestUser  = 3
+
+
+)
+
 type AppSession struct {
 	*sessions.Session
-	sessionID string
+	sessionID   string
+	sessionType int
 
 }
 
@@ -35,7 +46,6 @@ func NewStoreForSessionType (typeSession string,keyPairs ...[]byte) sessions.Sto
 	}
 
 
-	return nil
 }
 
 func NewCookieStore(keyPairs ...[]byte) *sessions.CookieStore{

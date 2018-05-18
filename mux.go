@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"log"
-	"net"
 	"net/http"
 	"strings"
 
 	"github.com/gorilla/sessions"
 )
 
-var multiPlex *multiplexor
+//var multiPlex *multiplexor
 
 
 
@@ -41,7 +40,7 @@ type ClientCustomContext struct {
 
 type HandlerMethod func(relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
 
-// TODO: quiero usarlo para que controle la sessiones,  de alguna manera, no se, es una idea que aun no termino de armar
+
 
 type handlerCommunication struct {
 	handlerMethodRef HandlerMethod
@@ -61,15 +60,15 @@ type InterpreterExecuteFunction func(*ClientCustomContext)
 
 func (hc *handlerCommunication) getSessionCookieFromRequest(ctx *ClientCustomContext) *AppSession{
 
-	//sessionDB, err := mgo.Dial("localhost")
-
-	//fmt.Println(err)
-	//c := sessionDB.DB("baseName?")
-//	fmt.Println(c)
 
 	session , _ := Store.Get(ctx.OriginalClientRequest,"sessionStore")
+	//session.ID ="testhnolamundo"
 
-	return  &AppSession{session,"sessionID"}
+	session.Values["sessionType"] = 1
+
+
+	return  &AppSession{session,
+				"sessionID", 0}
 
 
 }
@@ -81,29 +80,32 @@ func (hc *handlerCommunication) executeInterpreter(relativePath string, funcExec
 
 
 		hc.OriginalCtx = context
-		customContext := &ClientCustomContext{Ctx: context}
-		customContext.OriginalClientRequest = context.Request
+		customContext := &ClientCustomContext{	Ctx: context,
+											  	OriginalClientRequest:context.Request}
+
 
 
 		appSession := hc.getSessionCookieFromRequest(customContext)
 
-		//ip, _ := getClientIPByRequest(context.Request)
-		ip := context.ClientIP()
-		//fmt.Println(ip2)
-		clientWrapperReq :=
-			&parsedClientRequest{ClientCookieSession:appSession,
-												UrlParameters:context.Request.URL.Query(),
-												ClientIP:ip,
-												RawUrl:context.Request.URL.Path}
+
+		if !(SessionManager.sessions[appSession.ID] ){
+			SessionManager.register <- appSession
+
+		}
+
+
+
+
+		clientWrapperReq := &parsedClientRequest{
+									ClientCookieSession:appSession,
+									UrlParameters: context.Request.URL.Query(),
+									ClientIP: context.ClientIP(),
+									RawUrl: context.Request.URL.Path,
+								}
 
 
 		customContext.CliRequest = clientWrapperReq
 
-
-
-		var valStr = "asdasd"
-
-		appSession.Values["codigoRojo"] = []byte(valStr)
 
 		hc.getDataFromContext(customContext)
 
@@ -126,43 +128,25 @@ type GinWrapperHandler func() handlerCommunication
 
 type multiplexor struct {
 	routerEngine *gin.Engine
+	sessionHandler *SessionHandler
 	methodMap    map[string]*GinWrapperHandler
 }
 
-func getClientIPByRequest(req *http.Request) (ip string, err error) {
-
-	// Try via request
-	ip, port, err := net.SplitHostPort(req.RemoteAddr)
-	if err != nil {
-		log.Printf("debug: Getting req.RemoteAddr %v", err)
-		return "", err
-	} else {
-		log.Printf("debug: With req.RemoteAddr found IP:%v; Port: %v", ip, port)
-	}
-
-	userIP := net.ParseIP(ip)
-	if userIP == nil {
-		message := fmt.Sprintf("debug: Parsing IP from Request.RemoteAddr got nothing.")
-		log.Printf(message)
-		return "", fmt.Errorf(message)
-
-	}
-	log.Printf("debug: Found IP: %v", userIP)
-	return userIP.String(), nil
-
-}
 var Store sessions.Store
+var SessionManager * SessionHandler
 func NewMux() *multiplexor {
 
 
-	 Store = NewStoreForSessionType("asd",[]byte("super-secret_ohsi_key_megaHardcodeada"))
-	//Store  = NewCookieStore([]byte("super-secret_ohsi_key_megaHardcodeada"))
+	Store = NewStoreForSessionType("asd1",[]byte("super-secret_ohsi_key_megaHardcodeada"))
 
 
 
-
-	multiPlex = new(multiplexor)
+	multiPlex := new(multiplexor)
 	r := gin.Default()
+
+	multiPlex.startHandlerSessionConn()
+
+	SessionManager = multiPlex.sessionHandler
 
 	multiPlex.methodMap = make(map[string]*GinWrapperHandler)
 
@@ -212,16 +196,26 @@ func (multi *multiplexor) RunServer() {
 	multi.routerEngine.Run()
 }
 
+func (multi *multiplexor) startHandlerSessionConn(){
+
+	multi.sessionHandler = newSessionHandler()
+	go multi.sessionHandler.start()
+
+
+
+
+
+}
+
 func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath string, fMethod funcMethod, obj Entity) {
 
 	method := strings.ToUpper(methodName)
 
 	if methodFunc, ok := multi.methodMap[method]; ok {
 
-		//methodFunc.(func(string, gin.HandlerFunc))(relativePath, func(context *gin.Context) {
 		wrap := (*methodFunc)()
 		wrap.obj = obj
-		//wrap.getMethodHandler()
+
 		wrap.executeInterpreter(relativePath, func(context *ClientCustomContext) {
 			log.Println("Interpreter ejecutado con exito ! ")
 
