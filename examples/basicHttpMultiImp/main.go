@@ -21,16 +21,30 @@ func main() {
 	httpMux := http_multiplexor.NewMux()
 	stest := &TestSend{}
 
-	httpMux.AddMethodRestFul("GET", "/", func(context *http_multiplexor.ClientCustomContext) {
+	httpM := httpMux.AddMethodRestFul("GET", "/", func(context *http_multiplexor.ClientCustomContext) {
 
 		fmt.Println(stest.Param1)
 
 	}, stest)
 
-	httpMux.AddMethodRestFul("POST", "/TEST", func(context *http_multiplexor.ClientCustomContext) {
+
+
+	httpM2 := httpM.AddMethodRestFul("GET", "/TEST", func(context *http_multiplexor.ClientCustomContext) {
 		fmt.Println(stest.Param1)
 
 	}, stest)
+
+
+	httpM2.UploadSupport()
+
+
+	httpM2.AddMethodRestFul("GET", "/TEST", func(context *http_multiplexor.ClientCustomContext) {
+		fmt.Println(stest.Param1)
+
+	}, stest)
+
+
+
 
 	httpMux.RunServer()
 

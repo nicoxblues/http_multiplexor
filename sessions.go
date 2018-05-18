@@ -11,7 +11,7 @@ type AppSession struct {
 
 }
 
-func (ass *AppSession) Save(clientContext *ClientCustomContext){
+func (ass *AppSession) save(clientContext *ClientCustomContext){
 	ass.Session.Save(clientContext.OriginalClientRequest , clientContext.Ctx.Writer)
 
 
