@@ -72,6 +72,8 @@ func (hc *handlerComunitaction) executeInterpreter(relativePath string, funcExec
 
 		funcExec(customContext)
 
+		appSession.save(customContext)
+
 	})
 
 }
@@ -82,11 +84,21 @@ func (hc *handlerComunitaction) getMethodHandler() *HandlerMethod {
 
 }
 
-type GinWrapperHandler func() handlerComunitaction
+type GinWrapperHandler func() *handlerCommunication
 
 type multiplexor struct {
 	routerEngine *gin.Engine
 	methodMap    map[string]*GinWrapperHandler
+	perentMultiplex *multiplexor
+	basePath string
+	uploadtestSup string
+}
+
+func (multi *multiplexor) UploadSupport () *multiplexor{
+	multi.uploadtestSup = "gruoup with support"
+
+	return multi
+
 }
 
 func getClientIPByRequest(req *http.Request) (ip string, err error) {
@@ -115,11 +127,12 @@ func getClientIPByRequest(req *http.Request) (ip string, err error) {
 func NewMux() *multiplexor {
 
 	multiPlex = new(multiplexor)
+	multiPlex.perentMultiplex = nil
 	r := gin.Default()
 
 	multiPlex.methodMap = make(map[string]*GinWrapperHandler)
 
-	var getFunction GinWrapperHandler = func() handlerComunitaction {
+	var getFunction GinWrapperHandler = func() *handlerCommunication {
 
 		handler := handlerComunitaction{hadlerMethodRef: r.GET}
 
@@ -129,10 +142,10 @@ func NewMux() *multiplexor {
 			return hc.obj
 		}
 
-		return handler
+		return &handler
 	}
 
-	var postFunction GinWrapperHandler = func() handlerComunitaction {
+	var postFunction GinWrapperHandler = func() *handlerCommunication {
 
 		handler := handlerComunitaction{hadlerMethodRef: r.POST}
 
@@ -147,7 +160,7 @@ func NewMux() *multiplexor {
 
 		}
 
-		return handler
+		return &handler
 
 	}
 
@@ -160,11 +173,17 @@ func NewMux() *multiplexor {
 	return multiPlex
 
 }
-func (multi *multiplexor) RunServer() {
-	multi.routerEngine.Run()
+func (multi *multiplexor) RunServer(port ...string) {
+	// me cubro por las dudas, no  se puede
+
+	multi.routerEngine.Run(port ...)
+
+
 }
 
-func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath string, fMethod funcMethod, obj Entity) {
+
+
+func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath string, fMethod funcMethod, obj Entity) *multiplexor {
 
 	method := strings.ToUpper(methodName)
 
@@ -173,8 +192,10 @@ func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath strin
 		//methodFunc.(func(string, gin.HandlerFunc))(relativePath, func(context *gin.Context) {
 		wrap := (*methodFunc)()
 		wrap.obj = obj
-		//wrap.getMethodHandler()
-		wrap.executeInterpreter(relativePath, func(context *ClientCustomContext) {
+		path := multi.basePath + relativePath
+
+		wrap.executeInterpreter(path, func(context *ClientCustomContext) {
+			fmt.Println(multi.uploadtestSup)
 			log.Println("Interpreter ejecutado con exito ! ")
 
 			fMethod(context)
@@ -182,5 +203,8 @@ func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath strin
 		})
 
 	}
+
+	return &multiplexor{routerEngine:multi.routerEngine,perentMultiplex:multi, basePath:multi.basePath + relativePath,methodMap:multi.methodMap}
+
 
 }
