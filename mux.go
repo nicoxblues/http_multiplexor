@@ -7,20 +7,27 @@ import (
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/gorilla/sessions"
 )
 
 var multiPlex *multiplexor
 
+
+
+
 type Entity interface {
 	WriteEntity(*ClientCustomContext)
+
 }
 
 type funcMethod func(*ClientCustomContext)
 
 type parsedClientRequest struct {
-	Entity        *Entity
-	RawUrl        string
-	UrlParameters map[string][]string
+	Entity              *Entity
+	RawUrl              string
+	UrlParameters       map[string][]string
+	ClientCookieSession *AppSession
 
 	ClientIP string
 }
@@ -28,61 +35,94 @@ type parsedClientRequest struct {
 type ClientCustomContext struct {
 	Ctx        *gin.Context
 	CliRequest *parsedClientRequest
+	OriginalClientRequest *http.Request
+
 }
 
 type HandlerMethod func(relativePath string, handlers ...gin.HandlerFunc) gin.IRoutes
 
 // TODO: quiero usarlo para que controle la sessiones,  de alguna manera, no se, es una idea que aun no termino de armar
 
-type handlerComunitaction struct {
-	hadlerMethodRef HandlerMethod
-	obj             Entity
-	getData         func(*handlerComunitaction) interface{}
-	OriginalCtx     *gin.Context
-	clientCtx       *ClientCustomContext
+type handlerCommunication struct {
+	handlerMethodRef HandlerMethod
+	obj              Entity
+	getData          func(*handlerCommunication) interface{}
+	OriginalCtx      *gin.Context
+	clientCtx        *ClientCustomContext
 }
 
-func (hc *handlerComunitaction) getDataContext(ctx *ClientCustomContext) interface{} {
+func (hc *handlerCommunication) getDataFromContext(ctx *ClientCustomContext) interface{} {
 	hc.clientCtx = ctx
 	return hc.getData(hc)
 }
 
 type InterpreterExecuteFunction func(*ClientCustomContext)
 
-func (hc *handlerComunitaction) executeInterpreter(relativePath string, funcExec InterpreterExecuteFunction) {
 
-	hc.hadlerMethodRef(relativePath, func(context *gin.Context) {
+func (hc *handlerCommunication) getSessionCookieFromRequest(ctx *ClientCustomContext) *AppSession{
+
+	//sessionDB, err := mgo.Dial("localhost")
+
+	//fmt.Println(err)
+	//c := sessionDB.DB("baseName?")
+//	fmt.Println(c)
+
+	session , _ := Store.Get(ctx.OriginalClientRequest,"sessionStore")
+
+	return  &AppSession{session,"sessionID"}
+
+
+}
+
+func (hc *handlerCommunication) executeInterpreter(relativePath string, funcExec InterpreterExecuteFunction) {
+
+	hc.handlerMethodRef(relativePath, func(context *gin.Context) {
+
+
 
 		hc.OriginalCtx = context
 		customContext := &ClientCustomContext{Ctx: context}
-
-		clientWrapperReq := parsedClientRequest{}
-		customContext.CliRequest = &clientWrapperReq
-
-		ip, _ := getClientIPByRequest(context.Request)
-
-		clientWrapperReq.ClientIP = ip
-		clientWrapperReq.RawUrl = context.Request.URL.Path
-		clientWrapperReq.UrlParameters = context.Request.URL.Query()
+		customContext.OriginalClientRequest = context.Request
 
 
+		appSession := hc.getSessionCookieFromRequest(customContext)
 
-		hc.getDataContext(customContext)
+		//ip, _ := getClientIPByRequest(context.Request)
+		ip := context.ClientIP()
+		//fmt.Println(ip2)
+		clientWrapperReq :=
+			&parsedClientRequest{ClientCookieSession:appSession,
+												UrlParameters:context.Request.URL.Query(),
+												ClientIP:ip,
+												RawUrl:context.Request.URL.Path}
+
+
+		customContext.CliRequest = clientWrapperReq
+
+
+
+		var valStr = "asdasd"
+
+		appSession.Values["codigoRojo"] = []byte(valStr)
+
+		hc.getDataFromContext(customContext)
 
 
 		funcExec(customContext)
+
+		appSession.Save(customContext)
 
 	})
 
 }
 
-func (hc *handlerComunitaction) getMethodHandler() *HandlerMethod {
+func (hc *handlerCommunication) getMethodHandler() *HandlerMethod {
 
-	return &hc.hadlerMethodRef
+	return &hc.handlerMethodRef
 
 }
 
-type GinWrapperHandler func() handlerComunitaction
+type GinWrapperHandler func() handlerCommunication
 
 type multiplexor struct {
 	routerEngine *gin.Engine
@@ -111,19 +151,27 @@ func getClientIPByRequest(req *http.Request) (ip string, err error) {
 	return userIP.String(), nil
 
 }
-
+var Store sessions.Store
 func NewMux() *multiplexor {
+
+
+	 Store = NewStoreForSessionType("asd",[]byte("super-secret_ohsi_key_megaHardcodeada"))
+	//Store  = NewCookieStore([]byte("super-secret_ohsi_key_megaHardcodeada"))
+
+
+
 
 	multiPlex = new(multiplexor)
 	r := gin.Default()
 
 	multiPlex.methodMap = make(map[string]*GinWrapperHandler)
 
-	var getFunction GinWrapperHandler = func() handlerComunitaction {
+	var getFunction GinWrapperHandler = func() handlerCommunication {
 
-		handler := handlerComunitaction{hadlerMethodRef: r.GET}
+		handler := handlerCommunication{handlerMethodRef: r.GET}
 
-		handler.getData = func(hc *handlerComunitaction) interface{} {
+		handler.getData = func(hc *handlerCommunication) interface{} {
+
 
 			hc.obj.WriteEntity(hc.clientCtx)
 			return hc.obj
@@ -132,11 +180,11 @@ func NewMux() *multiplexor {
 		return handler
 	}
 
-	var postFunction GinWrapperHandler = func() handlerComunitaction {
+	var postFunction GinWrapperHandler = func() handlerCommunication {
 
-		handler := handlerComunitaction{hadlerMethodRef: r.POST}
+		handler := handlerCommunication{handlerMethodRef: r.POST}
 
-		handler.getData = func(hc *handlerComunitaction) interface{} {
+		handler.getData = func(hc *handlerCommunication) interface{} {
 
 			if hc.obj != nil { //GET, POST
 				hc.OriginalCtx.Bind(hc.obj)
@@ -176,6 +224,7 @@ func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath strin
 		//wrap.getMethodHandler()
 		wrap.executeInterpreter(relativePath, func(context *ClientCustomContext) {
 			log.Println("Interpreter ejecutado con exito ! ")
+
 
 			fMethod(context)
 
