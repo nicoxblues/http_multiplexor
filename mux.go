@@ -250,7 +250,7 @@ func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath strin
 		})
 
 	}
-
+	// TODO: ver de hacer que se devuelve a si mismo, con un objeto interno "childMultiplexor"
 	return &multiplexor{routerEngine:multi.routerEngine,perentMultiplex:multi, basePath:multi.basePath + relativePath,methodMap:multi.methodMap}
 
 
