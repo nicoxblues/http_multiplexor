@@ -127,12 +127,13 @@ func (hc *handlerCommunication) getMethodHandler() *HandlerMethod {
 type GinWrapperHandler func() *handlerCommunication
 
 type multiplexor struct {
-	routerEngine *gin.Engine
-	sessionHandler *SessionHandler
-	methodMap    map[string]*GinWrapperHandler
-	perentMultiplex *multiplexor
-	basePath string
-	uploadtestSup string
+	routerEngine    *gin.Engine
+	sessionHandler  *SessionHandler
+	methodMap       map[string]*GinWrapperHandler
+	parentMultiplex *multiplexor
+	basePath        string
+	uploadTestSup   string
+	childMultiplex  *multiplexor
 }
 
 var Store sessions.Store
@@ -195,6 +196,13 @@ func NewMux() *multiplexor {
 	return multiPlex
 
 }
+
+func (multi *multiplexor) UploadSupport () *multiplexor{
+	multi.uploadTestSup = "gruoup with support"
+
+	return multi
+
+}
 func (multi *multiplexor) RunServer(port ...string) {
 	// me cubro por las dudas, no  se puede
 
@@ -214,9 +222,6 @@ func (multi *multiplexor) startHandlerSessionConn(){
 
 }
 
-func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath string, fMethod funcMethod, obj Entity) {
-
-
 func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath string, fMethod funcMethod, obj Entity) *multiplexor {
 
 	method := strings.ToUpper(methodName)
@@ -235,8 +240,10 @@ func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath strin
 		})
 
 	}
-	// TODO: ver de hacer que se devuelve a si mismo, con un objeto interno "childMultiplexor"
-	return &multiplexor{routerEngine:multi.routerEngine,perentMultiplex:multi, basePath:multi.basePath + relativePath,methodMap:multi.methodMap}
+	multiChild :=  &multiplexor{routerEngine:multi.routerEngine, parentMultiplex:multi, basePath:multi.basePath + relativePath,methodMap:multi.methodMap}
+	multi.childMultiplex = multiChild
+
+	return multi
 
 
 }
