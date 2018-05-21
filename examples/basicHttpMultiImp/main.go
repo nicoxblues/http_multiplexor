@@ -16,6 +16,13 @@ func (t *TestSend) WriteEntity(ctx *http_multiplexor.ClientCustomContext) {
 
 }
 
+func (t *TestSend) WriteListEntity(ctx *http_multiplexor.ClientCustomContext) []http_multiplexor.Entity{
+
+
+	return nil
+
+}
+
 func main() {
 
 	httpMux := http_multiplexor.NewMux()
@@ -29,19 +36,20 @@ func main() {
 
 
 
-	httpM2 := httpM.AddMethodRestFul("GET", "/TEST", func(context *http_multiplexor.ClientCustomContext) {
+	httpM.AddMethodRestFul("GET", "/TEST", func(context *http_multiplexor.ClientCustomContext) {
 		fmt.Println(stest.Param1)
 
 	}, stest)
 
-
-	httpM2.UploadSupport()
-
-
-	httpM2.AddMethodRestFul("GET", "/TEST", func(context *http_multiplexor.ClientCustomContext) {
+	httpM.ChildMultiplex.AddMethodRestFul("GET", "/TEST123", func(context *http_multiplexor.ClientCustomContext) {
 		fmt.Println(stest.Param1)
+	},stest).ListSupport()
 
-	}, stest)
+
+
+
+
+
 
 
 
