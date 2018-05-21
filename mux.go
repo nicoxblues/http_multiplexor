@@ -17,6 +17,7 @@ import (
 
 type Entity interface {
 	WriteEntity(*ClientCustomContext)
+	WriteListEntity(*ClientCustomContext) [] Entity
 
 }
 
@@ -44,7 +45,12 @@ type HandlerMethod func(relativePath string, handlers ...gin.HandlerFunc) gin.IR
 
 type handlerCommunication struct {
 	handlerMethodRef HandlerMethod
+
+	// la info puede ser solicitada en lista o individual
 	obj              Entity
+	listEntity		 []Entity
+
+
 	getData          func(*handlerCommunication) interface{}
 	OriginalCtx      *gin.Context
 	clientCtx        *ClientCustomContext
@@ -124,7 +130,7 @@ func (hc *handlerCommunication) getMethodHandler() *HandlerMethod {
 
 }
 
-type GinWrapperHandler func() *handlerCommunication
+type GinWrapperHandler func(*multiplexor) *handlerCommunication
 
 type multiplexor struct {
 	routerEngine    *gin.Engine
@@ -133,7 +139,10 @@ type multiplexor struct {
 	parentMultiplex *multiplexor
 	basePath        string
 	uploadTestSup   string
-	childMultiplex  *multiplexor
+	ChildMultiplex  *multiplexor
+
+	shouldSendList bool
+
 }
 
 var Store sessions.Store
@@ -153,22 +162,28 @@ func NewMux() *multiplexor {
 	SessionManager = multiPlex.sessionHandler
 
 	multiPlex.methodMap = make(map[string]*GinWrapperHandler)
-
-	var getFunction GinWrapperHandler = func() *handlerCommunication {
+	// TODO: el unico sentido de tenerlo asi, es que tengo acceso al multiplexador root
+	var getFunction GinWrapperHandler = func(multi *multiplexor) *handlerCommunication {
 
 		handler := handlerCommunication{handlerMethodRef: r.GET}
 
 		handler.getData = func(hc *handlerCommunication) interface{} {
 
+			if multi.shouldSendList {
+				hc.listEntity =  hc.obj.WriteListEntity(hc.clientCtx)
 
-			hc.obj.WriteEntity(hc.clientCtx)
+			}else{
+				hc.obj.WriteEntity(hc.clientCtx)
+
+			}
+
 			return hc.obj
 		}
 
 		return &handler
 	}
 
-	var postFunction GinWrapperHandler = func() *handlerCommunication {
+	var postFunction GinWrapperHandler = func(multi *multiplexor) *handlerCommunication {
 
 		handler := handlerCommunication{handlerMethodRef: r.POST}
 
@@ -197,6 +212,15 @@ func NewMux() *multiplexor {
 
 }
 
+func (multi *multiplexor) ListSupport () *multiplexor{
+
+	multi.shouldSendList = true
+
+	return  multi
+
+
+}
+
 func (multi *multiplexor) UploadSupport () *multiplexor{
 	multi.uploadTestSup = "gruoup with support"
 
@@ -218,8 +242,6 @@ func (multi *multiplexor) startHandlerSessionConn(){
 
 
 
-
-
 }
 
 func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath string, fMethod funcMethod, obj Entity) *multiplexor {
@@ -228,7 +250,7 @@ func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath strin
 
 	if methodFunc, ok := multi.methodMap[method]; ok {
 
-		wrap := (*methodFunc)()
+		wrap := (*methodFunc)(multi)
 		wrap.obj = obj
 
 		wrap.executeInterpreter(relativePath, func(context *ClientCustomContext) {
@@ -241,7 +263,7 @@ func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath strin
 
 	}
 	multiChild :=  &multiplexor{routerEngine:multi.routerEngine, parentMultiplex:multi, basePath:multi.basePath + relativePath,methodMap:multi.methodMap}
-	multi.childMultiplex = multiChild
+	multi.ChildMultiplex = multiChild
 
 	return multi
 
