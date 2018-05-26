@@ -23,27 +23,38 @@ func (t *TestSend) WriteListEntity(ctx *http_multiplexor.ClientCustomContext) []
 
 }
 
+
+var getTEST http_multiplexor.FuncMethod = func(context *http_multiplexor.ClientCustomContext) {
+
+	fmt.Println("hola")
+
+}
+
+
+var gettestIi http_multiplexor.FuncMethod = func(context *http_multiplexor.ClientCustomContext) {
+
+	val := context.CliRequest.EntityObject.(*TestSend).Param1
+
+	fmt.Println("hola"  + val)
+
+}
+
 func main() {
 
 	httpMux := http_multiplexor.NewMux()
 	stest := &TestSend{}
 
-	httpM := httpMux.AddMethodRestFul("GET", "/", func(context *http_multiplexor.ClientCustomContext) {
+	getTEST.AddSupport(http_multiplexor.SupportUploadFile)
+	getTEST.AddSupport(http_multiplexor.SupportList)
 
-		fmt.Println(stest.Param1)
+	gettestIi.AddSupport(http_multiplexor.SupportList)
+	httpMux.AddMethodRestFul("GET", "/", &getTEST, nil)
+	httpMux.AddMethodRestFul("POST", "/te", &gettestIi, stest)
 
-	}, stest)
 
 
 
-	httpM.AddMethodRestFul("GET", "/TEST", func(context *http_multiplexor.ClientCustomContext) {
-		fmt.Println(stest.Param1)
 
-	}, stest)
-
-	httpM.ChildMultiplex.AddMethodRestFul("GET", "/TEST123", func(context *http_multiplexor.ClientCustomContext) {
-		fmt.Println(stest.Param1)
-	},stest).ListSupport()
 
 
 
