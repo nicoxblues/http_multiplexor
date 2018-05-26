@@ -141,8 +141,9 @@ func (hc *handlerCommunication) getSessionCookieFromRequest(ctx *ClientCustomCon
 }
 func (hc *handlerCommunication) executeHandlersSupport() {
 
-	hc.handlerSupport(hc)
-
+	if hc.handlerSupport != nil {
+		hc.handlerSupport(hc)
+	}
 
 }
 
