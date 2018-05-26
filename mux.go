@@ -10,8 +10,6 @@ import (
 	"github.com/gorilla/sessions"
 )
 
-//var multiPlex *multiplexor
-
 
 
 
@@ -21,10 +19,63 @@ type Entity interface {
 
 }
 
-type funcMethod func(*ClientCustomContext)
+
+// proporciona soporte para determinadas procesos o tareas, upadte de archivos, return type como listas de un determinado objeto etc...
+type handlerSupport func(communication *handlerCommunication)
+
+type SupportType int
+
+
+
+const (
+	SupportUploadFile SupportType = 0
+	SupportList SupportType = 1
+
+
+)
+
+
+
+
+
+type FuncMethod func(*ClientCustomContext)
+
+var supportMap = make(map[*FuncMethod]handlerSupport)
+
+
+func (fm *FuncMethod)  AddSupport(supportType SupportType){
+
+	switch supportType  {
+
+
+	case SupportUploadFile:
+
+			supportMap[fm] = func(hc *handlerCommunication) {
+
+				log.Println("********* Soporte para upload no implementado *************")
+			}
+
+	case SupportList:
+
+			supportMap[fm] = func(communication *handlerCommunication) {
+				if communication.obj != nil {
+					communication.listEntity = communication.obj.WriteListEntity(communication.clientCtx)
+				}
+				//log.Println("******** Soporte para listas no implementado ***********")
+
+			}
+
+
+	}
+
+
+
+
+
+}
 
 type parsedClientRequest struct {
-	Entity              *Entity
+	EntityObject        Entity
 	RawUrl              string
 	UrlParameters       map[string][]string
 	ClientCookieSession *AppSession
@@ -43,6 +94,7 @@ type HandlerMethod func(relativePath string, handlers ...gin.HandlerFunc) gin.IR
 
 
 
+
 type handlerCommunication struct {
 	handlerMethodRef HandlerMethod
 
@@ -53,12 +105,18 @@ type handlerCommunication struct {
 
 	getData          func(*handlerCommunication) interface{}
 	OriginalCtx      *gin.Context
+	handlerSupport 	 handlerSupport
 	clientCtx        *ClientCustomContext
 }
+
+
+
+
 
 func (hc *handlerCommunication) getDataFromContext(ctx *ClientCustomContext) interface{} {
 	hc.clientCtx = ctx
 	return hc.getData(hc)
+
 }
 
 type InterpreterExecuteFunction func(*ClientCustomContext)
@@ -70,11 +128,20 @@ func (hc *handlerCommunication) getSessionCookieFromRequest(ctx *ClientCustomCon
 	session , _ := Store.Get(ctx.OriginalClientRequest,"sessionStore")
 	//session.ID ="testhnolamundo"
 
-	session.Values["sessionType"] = 1
+	if session.Values["sessionID"] == nil{
+		session.Values["sessionID"] = "test"
 
+
+	}
 
 	return  &AppSession{session,
 				"sessionID", 0}
+
+
+}
+func (hc *handlerCommunication) executeHandlersSupport() {
+
+	hc.handlerSupport(hc)
 
 
 }
@@ -113,9 +180,11 @@ func (hc *handlerCommunication) executeInterpreter(relativePath string, funcExec
 		customContext.CliRequest = clientWrapperReq
 
 
+		hc.executeHandlersSupport()
 		hc.getDataFromContext(customContext)
+		customContext.CliRequest.EntityObject = hc.obj
 
-
+		// ejecucion  de la funcion del cliente
 		funcExec(customContext)
 
 		appSession.save(customContext)
@@ -133,6 +202,7 @@ func (hc *handlerCommunication) getMethodHandler() *HandlerMethod {
 type GinWrapperHandler func(*multiplexor) *handlerCommunication
 
 type multiplexor struct {
+
 	routerEngine    *gin.Engine
 	sessionHandler  *SessionHandler
 	methodMap       map[string]*GinWrapperHandler
@@ -149,8 +219,8 @@ var Store sessions.Store
 var SessionManager * SessionHandler
 func NewMux() *multiplexor {
 
-
-	Store = NewStoreForSessionType("asd1",[]byte("super-secret_ohsi_key_megaHardcodeada"))
+// TODO reveer esto
+	Store = NewStoreForSessionType("1",[]byte("super-secret_ohsi_key_megaHardcodeada"))
 
 
 
@@ -162,6 +232,8 @@ func NewMux() *multiplexor {
 	SessionManager = multiPlex.sessionHandler
 
 	multiPlex.methodMap = make(map[string]*GinWrapperHandler)
+
+
 	// TODO: el unico sentido de tenerlo asi, es que tengo acceso al multiplexador root
 	var getFunction GinWrapperHandler = func(multi *multiplexor) *handlerCommunication {
 
@@ -169,16 +241,20 @@ func NewMux() *multiplexor {
 
 		handler.getData = func(hc *handlerCommunication) interface{} {
 
-			if multi.shouldSendList {
-				hc.listEntity =  hc.obj.WriteListEntity(hc.clientCtx)
 
-			}else{
+			if hc.obj != nil {
+				//hc.handlerSupport(hc)
+
+				// Esto quedo medio deprecado TODO, ver de intergrar a handlerSupport
 				hc.obj.WriteEntity(hc.clientCtx)
+
 
 			}
 
 			return hc.obj
 		}
+
+
 
 		return &handler
 	}
@@ -189,7 +265,7 @@ func NewMux() *multiplexor {
 
 		handler.getData = func(hc *handlerCommunication) interface{} {
 
-			if hc.obj != nil { //GET, POST
+			if hc.obj != nil { // POST
 				hc.OriginalCtx.Bind(hc.obj)
 				fmt.Println(hc.obj)
 
@@ -202,6 +278,8 @@ func NewMux() *multiplexor {
 
 	}
 
+
+
 	multiPlex.routerEngine = r
 
 	multiPlex.methodMap["GET"] = &getFunction
@@ -211,22 +289,22 @@ func NewMux() *multiplexor {
 	return multiPlex
 
 }
-
-func (multi *multiplexor) ListSupport () *multiplexor{
-
-	multi.shouldSendList = true
-
-	return  multi
-
-
-}
-
-func (multi *multiplexor) UploadSupport () *multiplexor{
-	multi.uploadTestSup = "gruoup with support"
-
-	return multi
-
-}
+//
+//func (multi *multiplexor) ListSupport () *multiplexor{
+//
+//	multi.shouldSendList = true
+//
+//	return  multi
+//
+//
+//}
+//
+//func (multi *multiplexor) UploadSupport () *multiplexor{
+//	multi.uploadTestSup = "gruoup with support"
+//
+//	return multi
+//
+//}
 func (multi *multiplexor) RunServer(port ...string) {
 	// me cubro por las dudas, no  se puede
 
@@ -244,7 +322,7 @@ func (multi *multiplexor) startHandlerSessionConn(){
 
 }
 
-func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath string, fMethod funcMethod, obj Entity) *multiplexor {
+func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath string, fMethod *FuncMethod, obj Entity) *multiplexor {
 
 	method := strings.ToUpper(methodName)
 
@@ -252,12 +330,16 @@ func (multi *multiplexor) AddMethodRestFul(methodName string, relativePath strin
 
 		wrap := (*methodFunc)(multi)
 		wrap.obj = obj
+		wrap.handlerSupport = supportMap[fMethod]
 
 		wrap.executeInterpreter(relativePath, func(context *ClientCustomContext) {
 			log.Println("Interpreter ejecutado con exito ! ")
 
 
-			fMethod(context)
+
+
+
+			(*fMethod)(context)
 
 		})
 
