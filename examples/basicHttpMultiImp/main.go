@@ -3,13 +3,17 @@ package main
 import (
 	"fmt"
 	"http_multiplexor"
+	"os"
 )
 
 
 
 type TestSend struct {
-	Param1 string `json:"param1"`
-	Param2 string `json:"param2"`
+	Param1 string `json:"param1" form:"param1"`
+	Param2 string `json:"param2" form:"param2"`
+	file1 os.File `form:"file"`
+
+
 }
 
 func (t *TestSend) WriteEntity(ctx *http_multiplexor.ClientCustomContext) {
@@ -32,10 +36,11 @@ var getTEST http_multiplexor.FuncMethod = func(context *http_multiplexor.ClientC
 
 
 var gettestIi http_multiplexor.FuncMethod = func(context *http_multiplexor.ClientCustomContext) {
-
-	val := context.CliRequest.EntityObject.(*TestSend).Param1
-
-	fmt.Println("hola"  + val)
+	form ,_:= context.Ctx.MultipartForm()
+	fmt.Println(form.Value["asd"])
+	val := context.CliRequest.EntityObject.(*TestSend).file1
+	context.Ctx.SaveUploadedFile()
+	fmt.Println("hola "  + val.Name())
 
 }
 
