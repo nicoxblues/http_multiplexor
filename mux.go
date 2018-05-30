@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/gorilla/sessions"
+	"path/filepath"
+	"os"
 )
 
 
@@ -228,6 +230,12 @@ func NewMux() *multiplexor {
 	multiPlex := new(multiplexor)
 	r := gin.Default()
 
+	dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
+	fmt.Println(dir)
+
+	//index.tmpl
+	r.LoadHTMLGlob ( "statics/*.html")
+	r.Static("/lib", "statics/")
 	multiPlex.startHandlerSessionConn()
 
 	SessionManager = multiPlex.sessionHandler
